@@ -26,8 +26,9 @@ class AsyncEndpoint(Generic[T]):
     async def export(self, uuid: str, template: dict[str, Any]) -> dict[str, Any]:
         return await self.client.post(f"{self.path}/{uuid}/export", json={"template": template})
 
-    async def images(self, uuid: str) -> dict[str, Any]:
-        return await self.client.get(f"{self.path}/{uuid}/images")
+    async def images(self, uuid: str, *, fields: str | None = None) -> dict[str, Any]:
+        params = {"fields": fields} if fields else None
+        return await self.client.get(f"{self.path}/{uuid}/images", params=params)
 
     async def get(self, uuid: str, expand: str | None = None) -> T:
         params = {}
@@ -37,6 +38,9 @@ class AsyncEndpoint(Generic[T]):
         return self.model.model_validate(data)
 
     async def list(self, limit: int = 1000, offset: int = 0, expand: str | None = None, filter: str | Filter | None = None) -> ListResponse[T]:
+        # MoySklad silently ignores expand when limit > 100.
+        if expand:
+            limit = min(limit, 100)
         params: dict[str, Any] = {"limit": limit, "offset": offset}
         if expand:
             params["expand"] = expand
@@ -47,8 +51,8 @@ class AsyncEndpoint(Generic[T]):
         return self._list_adapter().validate_python(data)
 
     async def iter_all(self, expand: str | None = None, filter: str | Filter | None = None, chunk_size: int = 1000) -> AsyncGenerator[T, None]:
-        # МойСклад ограничивает limit максимумом в 1000.
-        chunk_size = min(chunk_size, 1000)
+        # МойСклад ограничивает limit максимумом в 1000; с expand — не более 100.
+        chunk_size = min(chunk_size, 100 if expand else 1000)
         offset = 0
         while True:
             response = await self.list(limit=chunk_size, offset=offset, expand=expand, filter=filter)
@@ -100,8 +104,9 @@ class SyncEndpoint(Generic[T]):
     def export(self, uuid: str, template: dict[str, Any]) -> dict[str, Any]:
         return self.client.post(f"{self.path}/{uuid}/export", json={"template": template})
 
-    def images(self, uuid: str) -> dict[str, Any]:
-        return self.client.get(f"{self.path}/{uuid}/images")
+    def images(self, uuid: str, *, fields: str | None = None) -> dict[str, Any]:
+        params = {"fields": fields} if fields else None
+        return self.client.get(f"{self.path}/{uuid}/images", params=params)
 
     def get(self, uuid: str, expand: str | None = None) -> T:
         params = {}
@@ -111,6 +116,8 @@ class SyncEndpoint(Generic[T]):
         return self.model.model_validate(data)
 
     def list(self, limit: int = 1000, offset: int = 0, expand: str | None = None, filter: str | Filter | None = None) -> ListResponse[T]:
+        if expand:
+            limit = min(limit, 100)
         params: dict[str, Any] = {"limit": limit, "offset": offset}
         if expand:
             params["expand"] = expand
@@ -121,7 +128,7 @@ class SyncEndpoint(Generic[T]):
         return self._list_adapter().validate_python(data)
 
     def iter_all(self, expand: str | None = None, filter: str | Filter | None = None, chunk_size: int = 1000) -> Generator[T, None, None]:
-        chunk_size = min(chunk_size, 1000)
+        chunk_size = min(chunk_size, 100 if expand else 1000)
         offset = 0
         while True:
             response = self.list(limit=chunk_size, offset=offset, expand=expand, filter=filter)

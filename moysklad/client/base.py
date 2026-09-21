@@ -80,5 +80,8 @@ class BaseClient:
         return float(2 ** attempt)
 
     def _build_url(self, path: str) -> str:
+        # Full href from MoySklad meta (webhook payloads) is allowed as-is.
+        if path.startswith("http://") or path.startswith("https://"):
+            return path
         path = path.lstrip("/")
         return f"{self.BASE_URL}/{path}"

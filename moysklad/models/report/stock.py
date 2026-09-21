@@ -1,9 +1,13 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from moysklad.models.base import Meta
 from typing import Any
 
+
 class StockRow(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     meta: Meta
+    assortmentId: str | None = None
     name: str | None = None
     code: str | None = None
     article: str | None = None
